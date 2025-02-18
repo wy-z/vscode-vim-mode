@@ -1,0 +1,78 @@
+{
+  "name": "vscode-vim-mode",
+  "displayName": "vscode-vim-mode",
+  "description": "Vim mode for Visual Studio Code",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.97.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "vscode-vim-mode.toggleVimMode",
+        "title": "Toggle Vim Mode"
+      },
+      {
+        "command": "vscode-vim-mode.vim",
+        "title": "Vim"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Vim Mode Configuration",
+      "properties": {
+        "vscode-vim-mode.vimPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the Vim or Neovim executable."
+        },
+        "vscode-vim-mode.vimArgs": {
+          "type": "string",
+          "default": "",
+          "description": "Vim arguments to be passed to the executable."
+        }
+      }
+    },
+    "menus": {
+      "editor/title": [
+        {
+          "command": "vscode-vim-mode.vim",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.97.0",
+    "@typescript-eslint/eslint-plugin": "^8.22.0",
+    "@typescript-eslint/parser": "^8.22.0",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.1",
+    "eslint": "^9.19.0",
+    "ts-loader": "^9.5.2",
+    "typescript": "^5.7.3",
+    "webpack": "^5.97.1",
+    "webpack-cli": "^6.0.1"
+  },
+  "dependencies": {
+    "neovim": "^5.3.0"
+  }
+}
