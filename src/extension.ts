@@ -41,7 +41,6 @@ async function toggleVimMode() {
     // open editing file if nvim
     if (isNvim()) {
       const curFile = await getNvimCurFile();
-      vscode.window.showInformationMessage(`Current file: ${curFile}`);
       if (curFile) {
         const document = await vscode.workspace.openTextDocument(curFile);
         vscode.window.showTextDocument(document);
@@ -94,7 +93,6 @@ async function toggleVimMode() {
 function handleVimModeExit() {
   // reset tabs
   var cmd: string | null = null;
-  vscode.window.showInformationMessage(`Original Tabs Mode: ${oriTabsMode}`);
   if (oriTabsMode === EditorTabsMode.MULTIPLE) {
     cmd = "workbench.action.showMultipleEditorTabs";
   } else if (oriTabsMode === EditorTabsMode.SINGLE) {
