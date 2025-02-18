@@ -3,6 +3,7 @@
   "displayName": "vscode-vim-mode",
   "description": "Vim mode for Visual Studio Code",
   "version": "0.1.0",
+  "repository": "https://github.com/wy-z/vscode-vim-mode",
   "engines": {
     "vscode": "^1.97.0"
   },
