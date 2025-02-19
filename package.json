@@ -10,7 +10,9 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
@@ -30,12 +32,17 @@
         "vscode-vim-mode.vimPath": {
           "type": "string",
           "default": "",
-          "description": "Path to the Vim or Neovim executable."
+          "description": "Path to the Vim or Nvim executable."
         },
         "vscode-vim-mode.vimArgs": {
           "type": "string",
           "default": "",
           "description": "Vim arguments to be passed to the executable."
+        },
+        "vscode-vim-mode.replaySave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Replay save events to Nvim."
         }
       }
     },

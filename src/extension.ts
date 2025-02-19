@@ -14,43 +14,40 @@ const enum EditorTabsMode {
 const NVIM_LISTEN_ADDRESS = "/tmp/vscode-vim-mode";
 
 var vimPath: string;
+var replaySave: boolean;
 var oriTabsMode: EditorTabsMode;
 var isInVimMode: boolean = false;
 var vimTerminal: vscode.Terminal | null = null;
+var nvimProcess: cp.ChildProcess | null = null;
 
 function isNvim(): boolean {
   return vimPath.includes("nvim");
 }
 
-async function getNvimCurFile(): Promise<string> {
-  try {
-    const nvim = neovim.attach({ socket: NVIM_LISTEN_ADDRESS });
-    return await nvim.buffer.name;
-  } catch (error) {
-    console.warn("failed to attach to neovim: ", error);
-  }
-  return "";
+function needNvimInstance(): boolean {
+  return isNvim() && replaySave;
 }
 
-async function toggleVimMode() {
-  if (isInVimMode) {
-    if (!vimTerminal) {
-      return;
-    }
+function startNvimInstance() {
+  nvimProcess = cp.spawn(vimPath, [
+    "--headless",
+    "--listen",
+    NVIM_LISTEN_ADDRESS,
+  ]);
+}
 
-    // open editing file if nvim
-    if (isNvim()) {
-      const curFile = await getNvimCurFile();
-      if (curFile) {
-        const document = await vscode.workspace.openTextDocument(curFile);
-        vscode.window.showTextDocument(document);
-      }
-    }
-    // exit vim mode
-    vimTerminal.dispose();
-    return;
+function stopNvimInstance() {
+  if (nvimProcess) {
+    nvimProcess.kill();
+    nvimProcess = null;
   }
+}
 
+function getNvim(): neovim.NeovimClient {
+  return neovim.attach({ socket: NVIM_LISTEN_ADDRESS });
+}
+
+async function enterVimMode() {
   // save original tabs mode
   oriTabsMode =
     vscode.workspace
@@ -70,6 +67,8 @@ async function toggleVimMode() {
     curFile = editor.document.uri.fsPath;
   }
 
+  // stop nvim if necessary
+  stopNvimInstance();
   // create terminal
   vimTerminal = vscode.window.createTerminal({
     name: VIM_MODE,
@@ -88,6 +87,32 @@ async function toggleVimMode() {
 
   // save state
   isInVimMode = true;
+}
+
+async function exitVimMode(deactivate = false) {
+  if (vimTerminal) {
+    // open editing file if nvim
+    if (isNvim()) {
+      const curFile = await getNvim().buffer.name;
+      if (curFile) {
+        const document = await vscode.workspace.openTextDocument(curFile);
+        vscode.window.showTextDocument(document);
+      }
+    }
+    // exit vim mode
+    vimTerminal.dispose();
+  }
+  if (!deactivate && needNvimInstance() && !nvimProcess) {
+    startNvimInstance();
+  }
+}
+
+async function toggleVimMode() {
+  if (isInVimMode) {
+    await exitVimMode();
+    return;
+  }
+  await enterVimMode();
 }
 
 function handleVimModeExit() {
@@ -116,10 +141,14 @@ export async function activate(context: vscode.ExtensionContext) {
     console.error("vim or neovim not found in path.");
     return;
   }
+  replaySave =
+    vscode.workspace
+      .getConfiguration("vscode-vim-mode")
+      .get<boolean>("replaySave") || false;
 
-  const registerToggleCommand = (commandName: string) => {
-    const command = vscode.commands.registerCommand(commandName, toggleVimMode);
-    context.subscriptions.push(command);
+  const registerToggleCommand = (cmdName: string) => {
+    const cmd = vscode.commands.registerCommand(cmdName, toggleVimMode);
+    context.subscriptions.push(cmd);
   };
   registerToggleCommand("vscode-vim-mode.toggleVimMode");
   registerToggleCommand("vscode-vim-mode.vim");
@@ -133,11 +162,35 @@ export async function activate(context: vscode.ExtensionContext) {
       }
     }),
   );
+
+  // start nvim if necessary
+  if (needNvimInstance()) {
+    startNvimInstance();
+  }
+
+  context.subscriptions.push(
+    vscode.workspace.onDidOpenTextDocument(async (document) => {
+      if (document.uri.scheme !== "file") {
+        return;
+      }
+      if (nvimProcess) {
+        await getNvim().command(`e ${document.uri.fsPath}`);
+      }
+    }),
+    vscode.workspace.onDidSaveTextDocument(async (document) => {
+      if (document.uri.scheme !== "file") {
+        return;
+      }
+      if (nvimProcess) {
+        await getNvim().command(`e ${document.uri.fsPath} || w`);
+      }
+    }),
+  );
 }
 
 // This method is called when your extension is deactivated
 export async function deactivate() {
   if (isInVimMode) {
-    await toggleVimMode();
+    await exitVimMode(true);
   }
 }
