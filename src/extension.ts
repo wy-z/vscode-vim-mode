@@ -19,6 +19,7 @@ var oriTabsMode: EditorTabsMode;
 var isInVimMode: boolean = false;
 var vimTerminal: vscode.Terminal | null = null;
 var nvimProcess: cp.ChildProcess | null = null;
+var nvimClient: neovim.NeovimClient | null = null;
 
 function isNvim(): boolean {
   return vimPath.includes("nvim");
@@ -29,11 +30,9 @@ function needNvimInstance(): boolean {
 }
 
 function startNvimInstance() {
-  nvimProcess = cp.spawn(vimPath, [
-    "--headless",
-    "--listen",
-    NVIM_LISTEN_ADDRESS,
-  ]);
+  nvimProcess = cp.spawn(vimPath, ["--embed", "--headless", "-n"], {
+    detached: false,
+  });
 }
 
 function stopNvimInstance() {
@@ -43,8 +42,24 @@ function stopNvimInstance() {
   }
 }
 
-function getNvim(): neovim.NeovimClient {
-  return neovim.attach({ socket: NVIM_LISTEN_ADDRESS });
+function getNvim(): neovim.NeovimClient | null {
+  if (nvimClient) {
+    return nvimClient;
+  }
+
+  if (isInVimMode) {
+    nvimClient = neovim.attach({ socket: NVIM_LISTEN_ADDRESS });
+  } else if (nvimProcess) {
+    nvimClient = neovim.attach({ proc: nvimProcess });
+  }
+  return null;
+}
+
+function resetNvim() {
+  if (nvimClient) {
+    nvimClient.quit();
+  }
+  nvimClient = null;
 }
 
 async function enterVimMode() {
@@ -87,32 +102,26 @@ async function enterVimMode() {
 
   // save state
   isInVimMode = true;
+  // reset nvim client
+  resetNvim();
 }
 
 async function exitVimMode(deactivate = false) {
   if (vimTerminal) {
     // open editing file if nvim
     if (isNvim()) {
-      const curFile = await getNvim().buffer.name;
+      const curFile = await getNvim()?.buffer.name;
       if (curFile) {
         const document = await vscode.workspace.openTextDocument(curFile);
         vscode.window.showTextDocument(document);
       }
     }
-    // exit vim mode
+    // exit vim mode, trigger handleVimModeExit
     vimTerminal.dispose();
   }
   if (!deactivate && needNvimInstance() && !nvimProcess) {
     startNvimInstance();
   }
-}
-
-async function toggleVimMode() {
-  if (isInVimMode) {
-    await exitVimMode();
-    return;
-  }
-  await enterVimMode();
 }
 
 function handleVimModeExit() {
@@ -128,6 +137,16 @@ function handleVimModeExit() {
   }
   // save state
   isInVimMode = false;
+  // reset nvim client
+  resetNvim();
+}
+
+async function toggleVimMode() {
+  if (isInVimMode) {
+    await exitVimMode();
+    return;
+  }
+  await enterVimMode();
 }
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -174,7 +193,15 @@ export async function activate(context: vscode.ExtensionContext) {
         return;
       }
       if (nvimProcess) {
-        await getNvim().command(`e ${document.uri.fsPath}`);
+        await getNvim()?.command(`e ${document.uri.fsPath}`);
+      }
+    }),
+    vscode.window.onDidChangeActiveTextEditor(async (editor) => {
+      if (!editor || editor.document.uri.scheme !== "file") {
+        return;
+      }
+      if (nvimProcess) {
+        await getNvim()?.command(`e ${editor.document.uri.fsPath}`);
       }
     }),
     vscode.workspace.onDidSaveTextDocument(async (document) => {
@@ -182,7 +209,7 @@ export async function activate(context: vscode.ExtensionContext) {
         return;
       }
       if (nvimProcess) {
-        await getNvim().command(`e ${document.uri.fsPath} || w`);
+        await getNvim()?.command(`e ${document.uri.fsPath} | e! | w`);
       }
     }),
   );
