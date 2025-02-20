@@ -72,7 +72,7 @@ class VimMode {
       // exit vim mode when text editor changed
       vscode.window.onDidChangeActiveTextEditor((e) => {
         if (e && this.isActive) {
-          this.handleExit();
+          this.exit();
         }
       }),
     );
