@@ -5,221 +5,240 @@ import * as util from "node:util";
 
 const exec = util.promisify(cp.exec);
 
-const VIM_MODE = "Vim Mode";
 const enum EditorTabsMode {
   MULTIPLE = "multiple",
   SINGLE = "single",
   NONE = "none",
 }
-const NVIM_LISTEN_ADDRESS = "/tmp/vscode-vim-mode";
 
-var vimPath: string;
-var replaySave: boolean;
-var oriTabsMode: EditorTabsMode;
-var isInVimMode: boolean = false;
-var vimTerminal: vscode.Terminal | null = null;
-var nvimProcess: cp.ChildProcess | null = null;
-var nvimClient: neovim.NeovimClient | null = null;
-
-function isNvim(): boolean {
-  return vimPath.includes("nvim");
+interface Config {
+  vimPath: string;
+  vimArgs: string;
+  replaySave: boolean;
 }
 
-function needNvimInstance(): boolean {
-  return isNvim() && replaySave;
-}
+class VimMode {
+  static NVIM_LISTEN_ADDRESS = "/tmp/vscode-vim-mode";
+  static MODE_NAME = "Vim Mode";
 
-function startNvimInstance() {
-  nvimProcess = cp.spawn(vimPath, ["--embed", "--headless", "-n"], {
-    detached: false,
-  });
-}
+  context: vscode.ExtensionContext;
+  config: Config;
+  oriTabsMode: EditorTabsMode;
+  vimTerminal: vscode.Terminal | null = null;
+  nvimProc: cp.ChildProcess | null = null;
+  nvimClient: neovim.NeovimClient | null = null;
+  isActive = false;
 
-function stopNvimInstance() {
-  if (nvimProcess) {
-    nvimProcess.kill();
-    nvimProcess = null;
-  }
-}
-
-function getNvim(): neovim.NeovimClient | null {
-  if (nvimClient) {
-    return nvimClient;
+  constructor(context: vscode.ExtensionContext) {
+    this.context = context;
+    this.config = this.loadConfig();
+    this.oriTabsMode = EditorTabsMode.MULTIPLE;
   }
 
-  if (isInVimMode) {
-    nvimClient = neovim.attach({ socket: NVIM_LISTEN_ADDRESS });
-  } else if (nvimProcess) {
-    nvimClient = neovim.attach({ proc: nvimProcess });
-  }
-  return null;
-}
-
-function resetNvim() {
-  if (nvimClient) {
-    nvimClient.quit();
-  }
-  nvimClient = null;
-}
-
-async function enterVimMode() {
-  // save original tabs mode
-  oriTabsMode =
-    vscode.workspace
-      .getConfiguration("workbench")
-      .get<EditorTabsMode>("editor.showTabs") ?? EditorTabsMode.MULTIPLE;
-
-  // get pwd
-  const pwd =
-    vscode.workspace.workspaceFolders &&
-    vscode.workspace.getWorkspaceFolder(
-      vscode.workspace.workspaceFolders[0].uri,
-    )?.uri;
-  // get current file
-  var curFile: string | null = null;
-  const editor = vscode.window.activeTextEditor;
-  if (editor) {
-    curFile = editor.document.uri.fsPath;
+  loadConfig(): Config {
+    const conf = vscode.workspace.getConfiguration("vscode-vim-mode");
+    return {
+      vimPath: conf.get("vimPath") || "",
+      vimArgs: conf.get("vimArgs") || "",
+      replaySave: conf.get("replaySave") || false,
+    };
   }
 
-  // stop nvim if necessary
-  stopNvimInstance();
-  // create terminal
-  vimTerminal = vscode.window.createTerminal({
-    name: VIM_MODE,
-    location: vscode.TerminalLocation.Editor,
-  });
-  const vimArgs = vscode.workspace
-    .getConfiguration("vscode-vim-mode")
-    .get<string>("vimArgs");
-  var vimCmd = `${vimPath} ${vimArgs} ${curFile || pwd || "./"}`;
-  if (isNvim()) {
-    vimCmd = `NVIM_LISTEN_ADDRESS=${NVIM_LISTEN_ADDRESS} ${vimCmd}`;
+  registerCommands() {
+    this.context.subscriptions.push(
+      vscode.commands.registerCommand("vscode-vim-mode.toggleVimMode", () =>
+        this.toggle(),
+      ),
+      vscode.commands.registerCommand("vscode-vim-mode.vim", () =>
+        this.toggle(),
+      ),
+    );
   }
-  vimTerminal.sendText(vimCmd, true);
-  vscode.commands.executeCommand("workbench.action.hideEditorTabs");
-  vimTerminal.show(false);
 
-  // save state
-  isInVimMode = true;
-  // reset nvim client
-  resetNvim();
-}
+  registerEventHandlers() {
+    this.context.subscriptions.push(
+      vscode.window.tabGroups.onDidChangeTabs((e) => {
+        if (e.closed.some((tab) => tab.label === VimMode.MODE_NAME)) {
+          this.handleExit();
+        }
+      }),
+      vscode.workspace.onDidOpenTextDocument((doc) => this.syncFile(doc.uri)),
+      vscode.window.onDidChangeActiveTextEditor(
+        (e) => e && this.syncFile(e.document.uri),
+      ),
+      vscode.workspace.onDidSaveTextDocument((doc) =>
+        this.syncFileSave(doc.uri),
+      ),
+    );
+  }
 
-async function exitVimMode(deactivate = false) {
-  if (vimTerminal) {
-    // open editing file if nvim
-    if (isNvim()) {
-      const curFile = await getNvim()?.buffer.name;
-      if (curFile) {
-        const document = await vscode.workspace.openTextDocument(curFile);
-        vscode.window.showTextDocument(document);
-      }
+  async syncFile(uri: vscode.Uri) {
+    if (uri.scheme === "file" && this.nvimProc) {
+      await this.getNvimClient()?.command(`e ${uri.fsPath}`);
     }
-    // exit vim mode, trigger handleVimModeExit
-    vimTerminal.dispose();
   }
-  if (!deactivate && needNvimInstance() && !nvimProcess) {
-    startNvimInstance();
-  }
-}
 
-function handleVimModeExit() {
-  // reset tabs
-  var cmd: string | null = null;
-  if (oriTabsMode === EditorTabsMode.MULTIPLE) {
-    cmd = "workbench.action.showMultipleEditorTabs";
-  } else if (oriTabsMode === EditorTabsMode.SINGLE) {
-    cmd = "workbench.action.showSingleEditorTab";
+  async syncFileSave(uri: vscode.Uri) {
+    if (uri.scheme === "file" && this.nvimProc) {
+      await this.getNvimClient()?.command(`e ${uri.fsPath} | e! | w`);
+    }
   }
-  if (cmd) {
-    vscode.commands.executeCommand(cmd);
-  }
-  // save state
-  isInVimMode = false;
-  // reset nvim client
-  resetNvim();
-}
 
-async function toggleVimMode() {
-  if (isInVimMode) {
-    await exitVimMode();
-    return;
+  hasNvim(): boolean {
+    return this.config.vimPath.includes("nvim");
   }
-  await enterVimMode();
-}
 
-export async function activate(context: vscode.ExtensionContext) {
-  // get vim path
-  vimPath =
-    vscode.workspace
+  needNvimProc(): boolean {
+    return this.hasNvim() && this.config.replaySave;
+  }
+
+  getNvimClient(): neovim.NeovimClient | null {
+    if (this.nvimClient) {
+      return this.nvimClient;
+    }
+
+    if (this.isActive) {
+      this.nvimClient = neovim.attach({ socket: VimMode.NVIM_LISTEN_ADDRESS });
+    } else if (this.nvimProc) {
+      this.nvimClient = neovim.attach({ proc: this.nvimProc });
+    }
+    return this.nvimClient;
+  }
+
+  resetNvimClient() {
+    if (this.nvimClient) {
+      this.nvimClient.quit();
+    }
+    this.nvimClient = null;
+  }
+
+  startNvimProc() {
+    this.nvimProc = cp.spawn(
+      this.config.vimPath,
+      ["--embed", "--headless", "-n"],
+      {
+        detached: false,
+      },
+    );
+  }
+
+  stopNvimProc() {
+    if (this.nvimProc) {
+      this.nvimProc.kill();
+      this.nvimProc = null;
+    }
+  }
+
+  async enter() {
+    // save original tabs mode
+    this.oriTabsMode =
+      vscode.workspace
+        .getConfiguration("workbench")
+        .get<EditorTabsMode>("editor.showTabs") ?? EditorTabsMode.MULTIPLE;
+
+    // get pwd
+    const pwd =
+      vscode.workspace.workspaceFolders &&
+      vscode.workspace.getWorkspaceFolder(
+        vscode.workspace.workspaceFolders[0].uri,
+      )?.uri;
+    // get current file
+    var curFile: string | null = null;
+    const editor = vscode.window.activeTextEditor;
+    if (editor) {
+      curFile = editor.document.uri.fsPath;
+    }
+
+    // stop nvim if necessary
+    this.stopNvimProc();
+    // create terminal
+    this.vimTerminal = vscode.window.createTerminal({
+      name: VimMode.MODE_NAME,
+      location: vscode.TerminalLocation.Editor,
+    });
+    const vimArgs = vscode.workspace
       .getConfiguration("vscode-vim-mode")
-      .get<string>("vimPath") ||
-    (await exec("which nvim || which vim")).stdout.trim();
-  if (!vimPath) {
-    console.error("vim or neovim not found in path.");
-    return;
+      .get<string>("vimArgs");
+    var vimCmd = `${this.config.vimPath} ${vimArgs} ${curFile || pwd || "./"}`;
+    if (this.hasNvim()) {
+      vimCmd = `NVIM_LISTEN_ADDRESS=${VimMode.NVIM_LISTEN_ADDRESS} ${vimCmd}`;
+    }
+    this.vimTerminal.sendText(vimCmd, true);
+    vscode.commands.executeCommand("workbench.action.hideEditorTabs");
+    this.vimTerminal.show(false);
+
+    // save state
+    this.isActive = true;
+    // reset nvim client
+    this.resetNvimClient();
   }
-  replaySave =
-    vscode.workspace
-      .getConfiguration("vscode-vim-mode")
-      .get<boolean>("replaySave") || false;
 
-  const registerToggleCommand = (cmdName: string) => {
-    const cmd = vscode.commands.registerCommand(cmdName, toggleVimMode);
-    context.subscriptions.push(cmd);
-  };
-  registerToggleCommand("vscode-vim-mode.toggleVimMode");
-  registerToggleCommand("vscode-vim-mode.vim");
-
-  context.subscriptions.push(
-    vscode.window.tabGroups.onDidChangeTabs((tabChangeEvent) => {
-      for (const removedTab of tabChangeEvent.closed) {
-        if (removedTab.label === VIM_MODE) {
-          handleVimModeExit();
+  async exit(deactivate = false) {
+    if (this.vimTerminal) {
+      // open editing file if nvim
+      if (this.hasNvim()) {
+        const curFile = await this.getNvimClient()?.buffer.name;
+        if (curFile) {
+          const document = await vscode.workspace.openTextDocument(curFile);
+          vscode.window.showTextDocument(document);
         }
       }
-    }),
-  );
-
-  // start nvim if necessary
-  if (needNvimInstance()) {
-    startNvimInstance();
+      // exit vim mode, trigger handleVimModeExit
+      this.vimTerminal.dispose();
+    }
+    if (!deactivate && this.needNvimProc() && !this.nvimProc) {
+      this.startNvimProc();
+    }
   }
 
-  context.subscriptions.push(
-    vscode.workspace.onDidOpenTextDocument(async (document) => {
-      if (document.uri.scheme !== "file") {
-        return;
-      }
-      if (nvimProcess) {
-        await getNvim()?.command(`e ${document.uri.fsPath}`);
-      }
-    }),
-    vscode.window.onDidChangeActiveTextEditor(async (editor) => {
-      if (!editor || editor.document.uri.scheme !== "file") {
-        return;
-      }
-      if (nvimProcess) {
-        await getNvim()?.command(`e ${editor.document.uri.fsPath}`);
-      }
-    }),
-    vscode.workspace.onDidSaveTextDocument(async (document) => {
-      if (document.uri.scheme !== "file") {
-        return;
-      }
-      if (nvimProcess) {
-        await getNvim()?.command(`e ${document.uri.fsPath} | e! | w`);
-      }
-    }),
-  );
+  handleExit() {
+    // reset tabs
+    var cmd: string | null = null;
+    if (this.oriTabsMode === EditorTabsMode.MULTIPLE) {
+      cmd = "workbench.action.showMultipleEditorTabs";
+    } else if (this.oriTabsMode === EditorTabsMode.SINGLE) {
+      cmd = "workbench.action.showSingleEditorTab";
+    }
+    if (cmd) {
+      vscode.commands.executeCommand(cmd);
+    }
+    // save state
+    this.isActive = false;
+    // reset nvim client
+    this.resetNvimClient();
+  }
+
+  async toggle() {
+    this.isActive ? await this.exit() : await this.enter();
+  }
+
+  dispose() {
+    this.isActive ? this.exit(true) : this.stopNvimProc();
+  }
+}
+
+let vimMode: VimMode;
+
+export async function activate(context: vscode.ExtensionContext) {
+  vimMode = new VimMode(context);
+
+  // update vim path
+  vimMode.config.vimPath =
+    vimMode.config.vimPath ||
+    (await exec("which nvim || which vim")).stdout.trim();
+  if (!vimMode.config.vimPath) {
+    throw new Error("vim or neovim not found");
+  }
+  vimMode.registerCommands();
+  vimMode.registerEventHandlers();
+
+  // start nvim if necessary
+  if (vimMode.needNvimProc()) {
+    vimMode.startNvimProc();
+  }
 }
 
 // This method is called when your extension is deactivated
 export async function deactivate() {
-  if (isInVimMode) {
-    await exitVimMode(true);
-  } else {
-    stopNvimInstance();
-  }
+  vimMode?.dispose();
 }
