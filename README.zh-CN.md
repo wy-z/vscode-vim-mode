@@ -4,6 +4,7 @@
 🌟 应该是最简单明了的 VSCode & Vim 集成插件
 🌟 能利用双方的生态，且避免了冲突，满足`既要又要`
 🌟 适合重度 Vim 用户，又想充分享用 VSCode 的生态（比如：Copilot）的你（我）
+🌟 可以和其他 Vim 模拟插件配合使用，无冲突 (比如: VSCodeVim、VSCodeNeovim)
 ```
 
 `vscode-vim-mode` 是一个 Visual Studio Code 扩展，提供 Vim 模式。通过这个扩展，用户可以在 VS Code 中使用 Vim 或 Neovim 进行编辑。
@@ -13,6 +14,7 @@
 - 在 VS Code 中切换 Vim 模式
 - 支持 Vim 和 Neovim
 - 保持编辑器标签页的状态
+- 同步保存事件到 Nvim，触发 format 等
 
 ## 安装
 
@@ -30,6 +32,7 @@
 3. 配置以下选项：
    - `vscode-vim-mode.vimPath`: (可选) Vim 或 Neovim 可执行文件的路径
    - `vscode-vim-mode.vimArgs`: (可选) 传递给 Vim 可执行文件的参数
+   - `vscode-vim-mode.replaySave`: (可选) 使用 Neovim 时，是否在 VSCode 中保存文件时同步事件到 Neovim (触发 format 等)。默认为 false
 
 ## 使用
 

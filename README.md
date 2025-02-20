@@ -3,49 +3,52 @@
 [中文文档](README.zh-CN.md)
 
 ```
-🌟 Probably the simplest and most straightforward VSCode & Vim integration plugin
-🌟 Leverages both ecosystems while avoiding conflicts, achieving the best of both worlds
-🌟 Suitable for heavy Vim users who also want to fully enjoy the VSCode ecosystem (e.g., Copilot)
+🌟 Probably the most straightforward VSCode & Vim integration plugin
+🌟 Leverage both ecosystems, avoid conflicts, and satisfy 'both/and'
+🌟 Perfect for heavy Vim users who want to fully enjoy VSCode's ecosystem (e.g., Copilot)
+🌟 Can be used alongside other Vim emulation plugins without conflicts (e.g., VSCodeVim, VSCodeNeovim)
 ```
 
-`vscode-vim-mode` is a Visual Studio Code extension that provides Vim mode. With this extension, users can use Vim or Neovim for editing within VS Code.
+`vscode-vim-mode` is a Visual Studio Code extension that provides Vim mode. With this extension, users can edit in VS Code using Vim or Neovim.
 
 ## Features
 
 - Toggle Vim mode in VS Code
-- Supports both Vim and Neovim
-- Maintains the state of editor tabs
+- Support for Vim and Neovim
+- Maintain editor tab states
+- Sync save events to Nvim, triggering formatting etc.
 
 ## Installation
 
 1. Open VS Code
-2. Go to the Extensions view by clicking the Extensions icon in the Sidebar or pressing `Ctrl+Shift+X`
+2. Click the Extensions icon in the sidebar or press `Ctrl+Shift+X` to enter the Extensions view
 3. Search for `vscode-vim-mode`
 4. Click the `Install` button
 
 ## Configuration (Optional)
 
-After installation, you can configure the extension in the settings:
+After installation, you can configure the extension in settings:
 
-1. Open Settings by clicking the gear icon or pressing `Ctrl+,`
+1. Click the gear icon or press `Ctrl+,` to open settings
 2. Search for `vscode-vim-mode`
 3. Configure the following options:
-   - `vscode-vim-mode.vimPath`: (Optional) Path to the Vim or Neovim executable
-   - `vscode-vim-mode.vimArgs`: (Optional) Arguments to pass to the Vim executable
+   - `vscode-vim-mode.vimPath`: (Optional) Path to Vim or Neovim executable
+   - `vscode-vim-mode.vimArgs`: (Optional) Arguments passed to Vim executable
+   - `vscode-vim-mode.replaySave`: (Optional) When using Neovim, whether to sync save events to Neovim (triggering format etc). Defaults to false
 
 ## Usage
 
 ### Toggle Vim Mode
 
-#### Command
+#### Commands
 
-Use the Command Palette (`Ctrl+Shift+P`) and enter one of the following commands:
+Use the command palette (`Ctrl+Shift+P`) and enter one of the following commands:
 
 - `Toggle Vim Mode`/`Vim`: Toggle Vim mode
 
 #### Button
 
-Click the `Vim` button in the upper right corner of the VSCode editor to toggle Vim mode
+Click the `Vim` button in the top-right corner of the VSCode editor to toggle Vim mode
 
 ## License
 
