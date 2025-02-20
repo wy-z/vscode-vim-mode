@@ -69,6 +69,12 @@ class VimMode {
       vscode.workspace.onDidSaveTextDocument((doc) =>
         this.syncFileSave(doc.uri),
       ),
+      // exit vim mode when text editor changed
+      vscode.window.onDidChangeActiveTextEditor((e) => {
+        if (e && this.isActive) {
+          this.handleExit();
+        }
+      }),
     );
   }
 
