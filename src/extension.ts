@@ -72,7 +72,7 @@ class VimMode {
       // exit vim mode when text editor changed
       vscode.window.onDidChangeActiveTextEditor((e) => {
         if (e && this.isActive) {
-          this.exit();
+          this.exit({ openCurFile: false });
         }
       }),
     );
@@ -179,10 +179,13 @@ class VimMode {
     this.resetNvimClient();
   }
 
-  async exit(deactivate = false) {
+  async exit({
+    startNvim = true,
+    openCurFile = true,
+  }: { startNvim?: boolean; openCurFile?: boolean } = {}) {
     if (this.vimTerminal) {
       // open editing file if nvim
-      if (this.hasNvim()) {
+      if (openCurFile && this.hasNvim()) {
         const curFile = await this.getNvimClient()?.buffer.name;
         if (curFile) {
           const document = await vscode.workspace.openTextDocument(curFile);
@@ -192,7 +195,7 @@ class VimMode {
       // exit vim mode, trigger handleVimModeExit
       this.vimTerminal.dispose();
     }
-    if (!deactivate && this.needNvimProc() && !this.nvimProc) {
+    if (startNvim && this.needNvimProc() && !this.nvimProc) {
       this.startNvimProc();
     }
   }
@@ -219,7 +222,7 @@ class VimMode {
   }
 
   dispose() {
-    this.isActive ? this.exit(true) : this.stopNvimProc();
+    this.isActive ? this.exit({ startNvim: false }) : this.stopNvimProc();
   }
 }
 
