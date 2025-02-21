@@ -1,15 +1,16 @@
 {
   "name": "vscode-vim-mode",
-  "displayName": "vscode-vim-mode",
+  "displayName": "Vim Mode",
   "description": "Vim mode for Visual Studio Code",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "repository": "https://github.com/wy-z/vscode-vim-mode",
   "publisher": "wy-z",
   "engines": {
     "vscode": "^1.97.0"
   },
   "categories": [
-    "Other"
+    "Other",
+    "Keymaps"
   ],
   "keywords": [
     "vim",
