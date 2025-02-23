@@ -2,7 +2,7 @@
   "name": "vscode-vim-mode",
   "displayName": "Vim Mode",
   "description": "Vim mode for Visual Studio Code",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "repository": "https://github.com/wy-z/vscode-vim-mode",
   "publisher": "wy-z",
   "engines": {
@@ -40,17 +40,22 @@
         "vscode-vim-mode.vimPath": {
           "type": "string",
           "default": "",
-          "description": "Path to the Vim or Nvim executable."
+          "description": "Path to the Vim or Nvim executable"
         },
         "vscode-vim-mode.vimArgs": {
           "type": "string",
           "default": "",
-          "description": "Vim arguments to be passed to the executable."
+          "description": "Vim arguments to be passed to the executable"
         },
         "vscode-vim-mode.replaySave": {
           "type": "boolean",
           "default": false,
-          "description": "Replay save events to Nvim."
+          "description": "Replay save events to Nvim"
+        },
+        "vscode-vim-mode.tabsMode": {
+          "type": "string",
+          "default": "",
+          "description": "(Read-only) Save original tabs mode"
         }
       }
     },

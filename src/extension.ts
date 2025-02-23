@@ -17,13 +17,14 @@ interface Config {
   replaySave: boolean;
 }
 
+const THIS = "vscode-vim-mode";
+
 class VimMode {
-  static NVIM_LISTEN_ADDRESS = "/tmp/vscode-vim-mode";
+  static NVIM_LISTEN_ADDRESS = "/tmp/" + THIS;
   static MODE_NAME = "Vim Mode";
 
   context: vscode.ExtensionContext;
   config: Config;
-  oriTabsMode: EditorTabsMode;
   vimTerminal: vscode.Terminal | null = null;
   nvimProc: cp.ChildProcess | null = null;
   nvimClient: neovim.NeovimClient | null = null;
@@ -32,11 +33,22 @@ class VimMode {
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
     this.config = this.loadConfig();
-    this.oriTabsMode = EditorTabsMode.MULTIPLE;
+  }
+
+  get tabsMode() {
+    return vscode.workspace
+      .getConfiguration(THIS)
+      .get<EditorTabsMode>("tabsMode");
+  }
+
+  set tabsMode(mode: EditorTabsMode | undefined) {
+    vscode.workspace
+      .getConfiguration(THIS)
+      .update("tabsMode", mode, vscode.ConfigurationTarget.Global);
   }
 
   loadConfig(): Config {
-    const conf = vscode.workspace.getConfiguration("vscode-vim-mode");
+    const conf = vscode.workspace.getConfiguration(THIS);
     return {
       vimPath: conf.get("vimPath") || "",
       vimArgs: conf.get("vimArgs") || "",
@@ -46,12 +58,10 @@ class VimMode {
 
   registerCommands() {
     this.context.subscriptions.push(
-      vscode.commands.registerCommand("vscode-vim-mode.toggleVimMode", () =>
+      vscode.commands.registerCommand(THIS + ".toggleVimMode", () =>
         this.toggle(),
       ),
-      vscode.commands.registerCommand("vscode-vim-mode.vim", () =>
-        this.toggle(),
-      ),
+      vscode.commands.registerCommand(THIS + ".vim", () => this.toggle()),
     );
   }
 
@@ -137,10 +147,12 @@ class VimMode {
 
   async enter() {
     // save original tabs mode
-    this.oriTabsMode =
-      vscode.workspace
-        .getConfiguration("workbench")
-        .get<EditorTabsMode>("editor.showTabs") ?? EditorTabsMode.MULTIPLE;
+    if (!this.tabsMode) {
+      this.tabsMode =
+        vscode.workspace
+          .getConfiguration("workbench")
+          .get<EditorTabsMode>("editor.showTabs") ?? EditorTabsMode.MULTIPLE;
+    }
 
     // get pwd
     const pwd =
@@ -163,7 +175,7 @@ class VimMode {
       location: vscode.TerminalLocation.Editor,
     });
     const vimArgs = vscode.workspace
-      .getConfiguration("vscode-vim-mode")
+      .getConfiguration(THIS)
       .get<string>("vimArgs");
     var vimCmd = `${this.config.vimPath} ${vimArgs} ${curFile || pwd || "./"}`;
     if (this.hasNvim()) {
@@ -203,14 +215,16 @@ class VimMode {
   handleExit() {
     // reset tabs
     var cmd: string | null = null;
-    if (this.oriTabsMode === EditorTabsMode.MULTIPLE) {
+    if (this.tabsMode === EditorTabsMode.MULTIPLE) {
       cmd = "workbench.action.showMultipleEditorTabs";
-    } else if (this.oriTabsMode === EditorTabsMode.SINGLE) {
+    } else if (this.tabsMode === EditorTabsMode.SINGLE) {
       cmd = "workbench.action.showSingleEditorTab";
     }
     if (cmd) {
       vscode.commands.executeCommand(cmd);
     }
+    // reset tabs mode
+    this.tabsMode = undefined;
     // save state
     this.isActive = false;
     // reset nvim client
@@ -240,6 +254,9 @@ export async function activate(context: vscode.ExtensionContext) {
   }
   vimMode.registerCommands();
   vimMode.registerEventHandlers();
+
+  // exit vim mode if necessary
+  vimMode.handleExit();
 
   // start nvim if necessary
   if (vimMode.needNvimProc()) {
