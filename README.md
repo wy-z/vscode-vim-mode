@@ -6,7 +6,7 @@
 🌟 Perfect for heavy Vim users who want to fully enjoy VSCode's ecosystem (e.g., Copilot)
 🌟 Probably the most straightforward VSCode & Vim integration plugin
 🌟 Leverage both ecosystems, avoid conflicts, and satisfy 'both/and'
-🌟 Can be used alongside other Vim emulation plugins without conflicts (e.g., VSCodeVim, VSCodeNeovim)
+🌟 Can be used alongside other Vim emulation plugins without conflicts (e.g., VSCodeNeovim, VSCodeVim)
 ```
 
 `vscode-vim-mode` is a Visual Studio Code extension that provides Vim mode. With this extension, users can edit in VS Code using Vim or Neovim.
@@ -17,6 +17,12 @@
 - Support for Vim and Neovim
 - Maintain editor tab states
 - Sync save events to Nvim, triggering formatting etc.
+
+## FAQ
+
+- Q: Vim Mode icon displays abnormally (shows as a square or question mark)
+
+   A: Configure `editor.fontFamily` or `terminal.integrated.fontFamily`, add a font that supports icons, such as: `Hack Nerd Font`
 
 ## Installation
 

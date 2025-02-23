@@ -214,14 +214,17 @@ class VimMode {
 
   handleExit() {
     // reset tabs
-    var cmd: string | null = null;
-    if (this.tabsMode === EditorTabsMode.MULTIPLE) {
-      cmd = "workbench.action.showMultipleEditorTabs";
-    } else if (this.tabsMode === EditorTabsMode.SINGLE) {
-      cmd = "workbench.action.showSingleEditorTab";
-    }
-    if (cmd) {
-      vscode.commands.executeCommand(cmd);
+    const tabsMode = vscode.workspace
+      .getConfiguration("workbench")
+      .get<EditorTabsMode>("editor.showTabs");
+    if (tabsMode !== this.tabsMode) {
+      if (this.tabsMode === EditorTabsMode.MULTIPLE) {
+        vscode.commands.executeCommand(
+          "workbench.action.showMultipleEditorTabs",
+        );
+      } else if (this.tabsMode === EditorTabsMode.SINGLE) {
+        vscode.commands.executeCommand("workbench.action.showSingleEditorTab");
+      }
     }
     // reset tabs mode
     this.tabsMode = undefined;

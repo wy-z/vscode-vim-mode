@@ -4,7 +4,7 @@
 🌟 适合重度 Vim 用户，又想充分享用 VSCode 的生态（比如：Copilot）的你（我）
 🌟 应该是最简单明了的 VSCode & Vim 集成插件
 🌟 能利用双方的生态，且避免了冲突，满足`既要又要`
-🌟 可以和其他 Vim 模拟插件配合使用，无冲突 (比如: VSCodeVim、VSCodeNeovim)
+🌟 可以和其他 Vim 模拟插件配合使用，无冲突 (比如: VSCodeNeovim、VSCodeVim)
 ```
 
 `vscode-vim-mode` 是一个 Visual Studio Code 扩展，提供 Vim 模式。通过这个扩展，用户可以在 VS Code 中使用 Vim 或 Neovim 进行编辑。
@@ -15,6 +15,13 @@
 - 支持 Vim 和 Neovim
 - 保持编辑器标签页的状态
 - 同步保存事件到 Nvim，触发 format 等
+
+## FAQ
+
+- Q: Vim Mode 的图标显示异常（比如显示为方框或问号）
+
+   A: 配置 `editor.fontFamily` 或 `terminal.integrated.fontFamily`，增加支持图标的字体，如：`Hack Nerd Font`
+
 
 ## 安装
 
