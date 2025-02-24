@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as cp from "node:child_process";
+import * as fs from "node:fs";
 import * as neovim from "neovim";
 import * as util from "node:util";
 
@@ -109,14 +110,18 @@ class VimMode {
   }
 
   getNvimClient(): neovim.NeovimClient | null {
-    if (this.nvimClient) {
-      return this.nvimClient;
+    if (!this.nvimClient) {
+      if (this.isActive) {
+        this.nvimClient = neovim.attach({
+          socket: VimMode.NVIM_LISTEN_ADDRESS,
+        });
+      } else if (this.nvimProc) {
+        this.nvimClient = neovim.attach({ proc: this.nvimProc });
+      }
     }
-
-    if (this.isActive) {
-      this.nvimClient = neovim.attach({ socket: VimMode.NVIM_LISTEN_ADDRESS });
-    } else if (this.nvimProc) {
-      this.nvimClient = neovim.attach({ proc: this.nvimProc });
+    // nvim may be exited
+    if (this.isActive && !fs.existsSync(VimMode.NVIM_LISTEN_ADDRESS)) {
+      this.resetNvimClient()
     }
     return this.nvimClient;
   }
@@ -199,7 +204,8 @@ class VimMode {
       // open editing file if nvim
       if (openCurFile && this.hasNvim()) {
         const curFile = await this.getNvimClient()?.buffer.name;
-        if (curFile) {
+
+        if (curFile && fs.existsSync(curFile)) {
           const document = await vscode.workspace.openTextDocument(curFile);
           vscode.window.showTextDocument(document);
         }
