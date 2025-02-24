@@ -1,6 +1,7 @@
 # vscode-vim-mode
 
 ```
+🌟 在 VSCode 中使用完整的 Vim 功能，且能无缝切换
 🌟 适合重度 Vim 用户，又想充分享用 VSCode 的生态（比如：Copilot）的你（我）
 🌟 应该是最简单明了的 VSCode & Vim 集成插件
 🌟 能利用双方的生态，且避免了冲突，满足`既要又要`
@@ -20,8 +21,7 @@
 
 - Q: Vim Mode 的图标显示异常（比如显示为方框或问号）
 
-   A: 配置 `editor.fontFamily` 或 `terminal.integrated.fontFamily`，增加支持图标的字体，如：`Hack Nerd Font`
-
+  A: 配置 `editor.fontFamily` 或 `terminal.integrated.fontFamily`，增加支持图标的字体，如：`Hack Nerd Font`
 
 ## 安装
 
