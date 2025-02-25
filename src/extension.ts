@@ -36,16 +36,14 @@ class VimMode {
     this.config = this.loadConfig();
   }
 
+  static TABS_MODE = "TabsMode";
+
   get tabsMode() {
-    return vscode.workspace
-      .getConfiguration(THIS)
-      .get<EditorTabsMode>("tabsMode");
+    return this.context.globalState.get<EditorTabsMode>(VimMode.TABS_MODE);
   }
 
   set tabsMode(mode: EditorTabsMode | undefined) {
-    vscode.workspace
-      .getConfiguration(THIS)
-      .update("tabsMode", mode, vscode.ConfigurationTarget.Global);
+    this.context.globalState.update(VimMode.TABS_MODE, mode);
   }
 
   loadConfig(): Config {

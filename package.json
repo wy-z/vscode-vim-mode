@@ -2,7 +2,7 @@
   "name": "vscode-vim-mode",
   "displayName": "Vim Mode",
   "description": "Vim mode for Visual Studio Code",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "repository": "https://github.com/wy-z/vscode-vim-mode",
   "publisher": "wy-z",
   "engines": {
@@ -51,11 +51,6 @@
           "type": "boolean",
           "default": false,
           "description": "Replay save events to Nvim"
-        },
-        "vscode-vim-mode.tabsMode": {
-          "type": "string",
-          "default": "",
-          "description": "(Read-only) Save original tabs mode"
         }
       }
     },
