@@ -20,53 +20,6 @@ interface Config {
 
 const THIS = "vscode-vim-mode";
 
-function retry({
-  task,
-  interval,
-  timeout,
-  onTimeout,
-  onError,
-}: {
-  task: () => Promise<boolean>;
-  interval: number;
-  timeout?: number;
-  onTimeout?: () => void;
-  onError?: (error: any) => void;
-}): () => void {
-  let intervalId: NodeJS.Timeout;
-  let timeoutId: NodeJS.Timeout | null = null;
-  const cancel = () => {
-    clearInterval(intervalId);
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-  };
-
-  // interval
-  intervalId = setInterval(async () => {
-    try {
-      if (await task()) {
-        cancel();
-      }
-    } catch (error) {
-      if (onError) {
-        onError(error);
-      }
-    }
-  }, interval);
-  // timeout
-  if (timeout) {
-    timeoutId = setTimeout(() => {
-      clearInterval(intervalId);
-      if (onTimeout) {
-        onTimeout();
-      }
-    }, timeout);
-  }
-  // return cancel
-  return cancel;
-}
-
 class VimMode {
   static NVIM_LISTEN_ADDRESS = "/tmp/" + THIS;
   static MODE_NAME = "Vim Mode";
@@ -362,4 +315,55 @@ export async function activate(context: vscode.ExtensionContext) {
 // This method is called when your extension is deactivated
 export async function deactivate() {
   vimMode?.dispose();
+}
+
+//
+// Utils
+//
+
+function retry({
+  task,
+  interval,
+  timeout,
+  onTimeout,
+  onError,
+}: {
+  task: () => Promise<boolean>;
+  interval: number;
+  timeout?: number;
+  onTimeout?: () => void;
+  onError?: (error: any) => void;
+}): () => void {
+  let intervalId: NodeJS.Timeout;
+  let timeoutId: NodeJS.Timeout | null = null;
+  const cancel = () => {
+    clearInterval(intervalId);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  };
+
+  // interval
+  intervalId = setInterval(async () => {
+    try {
+      if (await task()) {
+        cancel();
+      }
+    } catch (error) {
+      if (onError) {
+        onError(error);
+      }
+    }
+  }, interval);
+  // timeout
+  if (timeout) {
+    timeoutId = setTimeout(() => {
+      clearInterval(intervalId);
+      if (onTimeout) {
+        onTimeout();
+      }
+    }, timeout);
+  }
+  // return cancel
+  return cancel;
 }

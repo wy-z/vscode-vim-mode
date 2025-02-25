@@ -12,9 +12,8 @@
 
 ## 功能
 
-- 在 VS Code 中切换 Vim 模式
+- 在 VS Code 中切换 Vim 模式，并保持编辑状态
 - 支持 Vim 和 Neovim
-- 保持编辑器标签页的状态
 - 同步保存事件到 Nvim，触发 format 等
 
 ## FAQ
