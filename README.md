@@ -14,9 +14,8 @@
 
 ## Features
 
-- Toggle Vim mode in VS Code
+- Toggle Vim mode in VS Code while preserving editing state
 - Support for Vim and Neovim
-- Maintain editor tab states
 - Sync save events to Nvim, triggering formatting etc.
 
 ## FAQ
