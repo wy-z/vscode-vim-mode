@@ -111,7 +111,7 @@ class VimMode {
 
   getNvimClient(): neovim.NeovimClient | null {
     if (!this.nvimClient) {
-      if (this.isActive) {
+      if (this.isActive && fs.existsSync(VimMode.NVIM_LISTEN_ADDRESS)) {
         this.nvimClient = neovim.attach({
           socket: VimMode.NVIM_LISTEN_ADDRESS,
         });
@@ -121,7 +121,7 @@ class VimMode {
     }
     // nvim may be exited
     if (this.isActive && !fs.existsSync(VimMode.NVIM_LISTEN_ADDRESS)) {
-      this.resetNvimClient()
+      this.resetNvimClient();
     }
     return this.nvimClient;
   }
