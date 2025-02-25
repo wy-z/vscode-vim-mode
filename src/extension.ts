@@ -20,6 +20,53 @@ interface Config {
 
 const THIS = "vscode-vim-mode";
 
+function retry({
+  task,
+  interval,
+  timeout,
+  onTimeout,
+  onError,
+}: {
+  task: () => Promise<boolean>;
+  interval: number;
+  timeout?: number;
+  onTimeout?: () => void;
+  onError?: (error: any) => void;
+}): () => void {
+  let intervalId: NodeJS.Timeout;
+  let timeoutId: NodeJS.Timeout | null = null;
+  const cancel = () => {
+    clearInterval(intervalId);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  };
+
+  // interval
+  intervalId = setInterval(async () => {
+    try {
+      if (await task()) {
+        cancel();
+      }
+    } catch (error) {
+      if (onError) {
+        onError(error);
+      }
+    }
+  }, interval);
+  // timeout
+  if (timeout) {
+    timeoutId = setTimeout(() => {
+      clearInterval(intervalId);
+      if (onTimeout) {
+        onTimeout();
+      }
+    }, timeout);
+  }
+  // return cancel
+  return cancel;
+}
+
 class VimMode {
   static NVIM_LISTEN_ADDRESS = "/tmp/" + THIS;
   static MODE_NAME = "Vim Mode";
@@ -164,10 +211,13 @@ class VimMode {
         vscode.workspace.workspaceFolders[0].uri,
       )?.uri;
     // get current file
-    var curFile: string | null = null;
+    var curFile: string | undefined;
     const editor = vscode.window.activeTextEditor;
-    if (editor) {
-      curFile = editor.document.uri.fsPath;
+    curFile = editor?.document.uri.fsPath;
+    // get current line
+    var curLine: number | undefined;
+    if (curFile) {
+      curLine = editor?.selection.active.line;
     }
 
     // stop nvim if necessary
@@ -192,12 +242,21 @@ class VimMode {
     this.isActive = true;
     // reset nvim client
     this.resetNvimClient();
+
+    // after enter
+    // go to line
+    if (curLine) {
+      const line = curLine + 1;
+      this.vimTerminal.sendText(`:${line}`, true);
+    }
   }
 
   async exit({
     startNvim = true,
     openCurFile = true,
   }: { startNvim?: boolean; openCurFile?: boolean } = {}) {
+    var curLine: number | null = null;
+
     if (this.vimTerminal) {
       // open editing file if nvim
       if (openCurFile && this.hasNvim()) {
@@ -206,6 +265,12 @@ class VimMode {
         if (curFile && fs.existsSync(curFile)) {
           const document = await vscode.workspace.openTextDocument(curFile);
           vscode.window.showTextDocument(document);
+
+          // save current line
+          const cursor = await this.getNvimClient()?.window.cursor;
+          if (cursor) {
+            curLine = cursor[0];
+          }
         }
       }
       // exit vim mode, trigger handleVimModeExit
@@ -213,6 +278,29 @@ class VimMode {
     }
     if (startNvim && this.needNvimProc() && !this.nvimProc) {
       this.startNvimProc();
+    }
+
+    // after exit
+    // go to line
+    if (curLine) {
+      const line = curLine - 1;
+      retry({
+        task: async () => {
+          const editor = vscode.window.activeTextEditor;
+          if (!editor) {
+            return false;
+          }
+          const position = new vscode.Position(line, 0);
+          editor.selection = new vscode.Selection(position, position);
+          editor.revealRange(new vscode.Range(position, position));
+          return true;
+        },
+        interval: 200,
+        timeout: 2000,
+        onTimeout: () => {
+          console.warn("timeout to set editor line");
+        },
+      });
     }
   }
 
