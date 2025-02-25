@@ -180,7 +180,7 @@ class VimMode {
     const vimArgs = vscode.workspace
       .getConfiguration(THIS)
       .get<string>("vimArgs");
-    var vimCmd = `${this.config.vimPath} ${vimArgs} ${curFile || pwd || "./"}`;
+    var vimCmd = `${this.config.vimPath} ${vimArgs} '${curFile || pwd || "./"}'`;
     if (this.hasNvim()) {
       vimCmd = `NVIM_LISTEN_ADDRESS=${VimMode.NVIM_LISTEN_ADDRESS} ${vimCmd}`;
     }
