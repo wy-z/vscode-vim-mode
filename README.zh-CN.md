@@ -22,21 +22,6 @@
 
   A: 配置 `editor.fontFamily` 或 `terminal.integrated.fontFamily`，增加支持图标的字体，如：`Hack Nerd Font`
 
-- Q: Vim LSP 工作异常，如无法正常 `gd`
-
-  A: [VSCode 的问题](https://github.com/microsoft/vscode/issues/81213)。VSCode 的内置 terminal 的 PATH 在启动过程中，会继承变量，`PATH` 变成乱序，需要在你的 terminal 配置中对 PATH 重新排序
-
-  ```python
-  # 参考代码，需要根据自己的终端修改调用
-  #!/usr/bin/env python3
-  import os
-
-  path_env = os.getenv("PATH", "")
-  paths = path_env.split(os.pathsep)
-  paths.sort(key=lambda x: x.count(os.sep), reverse=True)
-  print(os.pathsep.join(paths), end="")
-  ```
-
 ## 安装
 
 1. 打开 VS Code
