@@ -162,7 +162,7 @@ class VimMode {
       vscode.workspace.workspaceFolders &&
       vscode.workspace.getWorkspaceFolder(
         vscode.workspace.workspaceFolders[0].uri,
-      )?.uri;
+      )?.uri.fsPath;
     // get current file
     var curFile: string | undefined;
     const editor = vscode.window.activeTextEditor;
@@ -187,7 +187,8 @@ class VimMode {
     if (this.hasNvim()) {
       vimCmd = `NVIM_LISTEN_ADDRESS=${VimMode.NVIM_LISTEN_ADDRESS} ${vimCmd}`;
     }
-    this.vimTerminal.sendText(vimCmd, true);
+    // terminal PATH may be disordered
+    this.vimTerminal.sendText(`PATH=${process.env.PATH} ` + vimCmd, true);
     vscode.commands.executeCommand("workbench.action.hideEditorTabs");
     this.vimTerminal.show(false);
 

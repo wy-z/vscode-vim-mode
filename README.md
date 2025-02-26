@@ -24,21 +24,6 @@
 
   A: Configure `editor.fontFamily` or `terminal.integrated.fontFamily`, add a font that supports icons, such as: `Hack Nerd Font`
 
-- Q: Vim LSP works abnormally, such as cannot use `gd` properly
-
-  A: [VSCode issue](https://github.com/microsoft/vscode/issues/81213). VSCode's built-in terminal inherits environment variables during startup, causing the `PATH` to become disordered. You need to reorder the PATH in your terminal configuration.
-
-  ```python
-  # Reference code, modify the call according to your terminal
-  #!/usr/bin/env python3
-  import os
-
-  path_env = os.getenv("PATH", "")
-  paths = path_env.split(os.pathsep)
-  paths.sort(key=lambda x: x.count(os.sep), reverse=True)
-  print(os.pathsep.join(paths), end="")
-  ```
-
 ## Installation
 
 1. Open VS Code
