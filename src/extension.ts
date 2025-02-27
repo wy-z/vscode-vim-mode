@@ -35,12 +35,31 @@ class VimMode {
   vimTerminal: vscode.Terminal | null = null;
   nvimProc: cp.ChildProcess | null = null;
   nvimClient: neovim.NeovimClient | null = null;
-  isActive = false;
+  _isActive = false;
   isDisposing = false;
 
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
     this.config = this.loadConfig();
+  }
+
+  get isActive() {
+    return this._isActive;
+  }
+
+  set isActive(value) {
+    if (value === this._isActive) {
+      return;
+    }
+    this.onModeSwitch(value);
+    this._isActive = value;
+  }
+
+  onModeSwitch(isActive: boolean) {
+    // reset nvim client
+    this.resetNvimClient();
+    // reset edit state
+    this.editState = {};
   }
 
   static KEY_TABS_MODE = "TabsMode";
@@ -209,12 +228,10 @@ class VimMode {
     vscode.commands.executeCommand("workbench.action.hideEditorTabs");
     this.vimTerminal.show(false);
 
-    // save state
-    this.isActive = true;
-    // reset nvim client
-    this.resetNvimClient();
     // after enter
     await this.afterEnter();
+    // switch mode
+    this.isActive = true;
   }
 
   async afterEnter() {
@@ -223,8 +240,6 @@ class VimMode {
       const line = this.editState.line + 1;
       this.vimTerminal?.sendText(`:${line}`, true);
     }
-    // reset edit state
-    this.editState = {};
   }
 
   async beforeExit() {
@@ -258,6 +273,7 @@ class VimMode {
   }
 
   async handleExit() {
+    this.vimTerminal = null;
     // reset tabs
     const tabsMode = vscode.workspace
       .getConfiguration("workbench")
@@ -273,12 +289,10 @@ class VimMode {
     }
     // reset tabs mode
     this.tabsMode = undefined;
-    // save state
-    this.isActive = false;
-    // reset nvim client
-    this.resetNvimClient();
     // after exit
     await this.afterExit();
+    // switch mode
+    this.isActive = false;
   }
 
   async afterExit() {
