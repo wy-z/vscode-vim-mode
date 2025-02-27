@@ -18,7 +18,7 @@ interface Config {
   replaySave: boolean;
 }
 
-interface editState {
+interface EditState {
   file?: string;
   line?: number;
 }
@@ -31,12 +31,13 @@ class VimMode {
 
   context: vscode.ExtensionContext;
   config: Config;
-  editState: editState = {};
+  editState: EditState = {};
   vimTerminal: vscode.Terminal | null = null;
   nvimProc: cp.ChildProcess | null = null;
-  nvimClient: neovim.NeovimClient | null = null;
-  _isActive = false;
   isDisposing = false;
+
+  _isActive = false;
+  _nvimClient: neovim.NeovimClient | null = null;
 
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
@@ -51,11 +52,11 @@ class VimMode {
     if (value === this._isActive) {
       return;
     }
-    this.onModeSwitch(value);
     this._isActive = value;
+    this.afterModeSwitch();
   }
 
-  onModeSwitch(isActive: boolean) {
+  afterModeSwitch() {
     // reset nvim client
     this.resetNvimClient();
     // reset edit state
@@ -141,27 +142,27 @@ class VimMode {
   }
 
   getNvimClient(): neovim.NeovimClient | null {
-    if (!this.nvimClient) {
+    if (!this._nvimClient) {
       if (this.isActive && fs.existsSync(VimMode.NVIM_LISTEN_ADDRESS)) {
-        this.nvimClient = neovim.attach({
+        this._nvimClient = neovim.attach({
           socket: VimMode.NVIM_LISTEN_ADDRESS,
         });
       } else if (this.nvimProc) {
-        this.nvimClient = neovim.attach({ proc: this.nvimProc });
+        this._nvimClient = neovim.attach({ proc: this.nvimProc });
       }
     }
     // nvim may be exited
     if (this.isActive && !fs.existsSync(VimMode.NVIM_LISTEN_ADDRESS)) {
       this.resetNvimClient();
     }
-    return this.nvimClient;
+    return this._nvimClient;
   }
 
   resetNvimClient() {
-    if (this.nvimClient) {
-      this.nvimClient.quit();
+    if (this._nvimClient) {
+      this._nvimClient.quit();
     }
-    this.nvimClient = null;
+    this._nvimClient = null;
   }
 
   startNvimProc() {
@@ -191,7 +192,6 @@ class VimMode {
     }
 
     // save edit state
-    this.editState = {};
     const editor = vscode.window.activeTextEditor;
     this.editState.file = editor?.document.uri.fsPath;
     if (this.editState.file) {
