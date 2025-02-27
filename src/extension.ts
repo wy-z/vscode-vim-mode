@@ -18,7 +18,7 @@ interface Config {
   replaySave: boolean;
 }
 
-interface editState {
+interface EditState {
   file?: string;
   line?: number;
 }
@@ -31,16 +31,36 @@ class VimMode {
 
   context: vscode.ExtensionContext;
   config: Config;
-  editState: editState = {};
+  editState: EditState = {};
   vimTerminal: vscode.Terminal | null = null;
   nvimProc: cp.ChildProcess | null = null;
-  nvimClient: neovim.NeovimClient | null = null;
-  isActive = false;
   isDisposing = false;
+
+  _isActive = false;
+  _nvimClient: neovim.NeovimClient | null = null;
 
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
     this.config = this.loadConfig();
+  }
+
+  get isActive() {
+    return this._isActive;
+  }
+
+  set isActive(value) {
+    if (value === this._isActive) {
+      return;
+    }
+    this._isActive = value;
+    this.afterModeSwitch();
+  }
+
+  afterModeSwitch() {
+    // reset nvim client
+    this.resetNvimClient();
+    // reset edit state
+    this.editState = {};
   }
 
   static KEY_TABS_MODE = "TabsMode";
@@ -122,27 +142,27 @@ class VimMode {
   }
 
   getNvimClient(): neovim.NeovimClient | null {
-    if (!this.nvimClient) {
+    if (!this._nvimClient) {
       if (this.isActive && fs.existsSync(VimMode.NVIM_LISTEN_ADDRESS)) {
-        this.nvimClient = neovim.attach({
+        this._nvimClient = neovim.attach({
           socket: VimMode.NVIM_LISTEN_ADDRESS,
         });
       } else if (this.nvimProc) {
-        this.nvimClient = neovim.attach({ proc: this.nvimProc });
+        this._nvimClient = neovim.attach({ proc: this.nvimProc });
       }
     }
     // nvim may be exited
     if (this.isActive && !fs.existsSync(VimMode.NVIM_LISTEN_ADDRESS)) {
       this.resetNvimClient();
     }
-    return this.nvimClient;
+    return this._nvimClient;
   }
 
   resetNvimClient() {
-    if (this.nvimClient) {
-      this.nvimClient.quit();
+    if (this._nvimClient) {
+      this._nvimClient.quit();
     }
-    this.nvimClient = null;
+    this._nvimClient = null;
   }
 
   startNvimProc() {
@@ -172,7 +192,6 @@ class VimMode {
     }
 
     // save edit state
-    this.editState = {};
     const editor = vscode.window.activeTextEditor;
     this.editState.file = editor?.document.uri.fsPath;
     if (this.editState.file) {
@@ -209,12 +228,10 @@ class VimMode {
     vscode.commands.executeCommand("workbench.action.hideEditorTabs");
     this.vimTerminal.show(false);
 
-    // save state
-    this.isActive = true;
-    // reset nvim client
-    this.resetNvimClient();
     // after enter
     await this.afterEnter();
+    // switch mode
+    this.isActive = true;
   }
 
   async afterEnter() {
@@ -223,8 +240,6 @@ class VimMode {
       const line = this.editState.line + 1;
       this.vimTerminal?.sendText(`:${line}`, true);
     }
-    // reset edit state
-    this.editState = {};
   }
 
   async beforeExit() {
@@ -258,6 +273,7 @@ class VimMode {
   }
 
   async handleExit() {
+    this.vimTerminal = null;
     // reset tabs
     const tabsMode = vscode.workspace
       .getConfiguration("workbench")
@@ -273,12 +289,10 @@ class VimMode {
     }
     // reset tabs mode
     this.tabsMode = undefined;
-    // save state
-    this.isActive = false;
-    // reset nvim client
-    this.resetNvimClient();
     // after exit
     await this.afterExit();
+    // switch mode
+    this.isActive = false;
   }
 
   async afterExit() {
