@@ -1,5 +1,19 @@
 # vscode-vim-mode
 
+## TL;DR
+
+```
+🌟 Transforms VS Code into a GVim by running Vim within its integrated terminal
+
+🌟 Preserves editing states between sessions, sync file save actions between VSCode and Vim
+
+🌟 Only suitable for hardcore Vim users, you need to have a meticulously configured Vim environment already in place
+
+🌟 Untested on Windows, it should work with WSL
+```
+
+---
+
 [中文文档](README.zh-CN.md)
 
 ```
