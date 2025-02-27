@@ -223,11 +223,12 @@ class VimMode {
       const line = this.editState.line + 1;
       this.vimTerminal?.sendText(`:${line}`, true);
     }
+    // reset edit state
+    this.editState = {};
   }
 
   async beforeExit() {
     // save edit state
-    this.editState = {};
     if (this.vimTerminal) {
       // open editing file if nvim
       if (this.hasNvim()) {
