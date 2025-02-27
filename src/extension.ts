@@ -64,11 +64,13 @@ class VimMode {
 
   registerCommands() {
     this.context.subscriptions.push(
-      vscode.commands.registerCommand(THIS + ".toggleVimMode", async () =>  // 添加 async
-        await this.toggle(),
+      vscode.commands.registerCommand(
+        THIS + ".toggleVimMode",
+        async () => await this.toggle(),
       ),
-      vscode.commands.registerCommand(THIS + ".vim", async () =>  // 添加 async
-        await this.toggle(),
+      vscode.commands.registerCommand(
+        THIS + ".vim",
+        async () => await this.toggle(),
       ),
     );
   }
@@ -92,7 +94,8 @@ class VimMode {
       // exit vim mode when text editor changed
       vscode.window.onDidChangeActiveTextEditor(async (e) => {
         if (e && this.isActive) {
-          await this.exit();
+          // exit and trigger handleExit
+          this.vimTerminal?.dispose();
         }
       }),
     );
@@ -249,10 +252,8 @@ class VimMode {
   async exit() {
     await this.beforeExit();
 
-    if (this.vimTerminal) {
-      // exit vim mode, trigger handleVimModeExit
-      this.vimTerminal.dispose();
-    }
+    // exit vim mode, trigger handleExit
+    this.vimTerminal?.dispose();
   }
 
   async handleExit() {
