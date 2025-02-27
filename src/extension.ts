@@ -18,6 +18,11 @@ interface Config {
   replaySave: boolean;
 }
 
+interface editState {
+  file?: string;
+  line?: number;
+}
+
 const THIS = "vscode-vim-mode";
 
 class VimMode {
@@ -26,24 +31,26 @@ class VimMode {
 
   context: vscode.ExtensionContext;
   config: Config;
+  editState: editState = {};
   vimTerminal: vscode.Terminal | null = null;
   nvimProc: cp.ChildProcess | null = null;
   nvimClient: neovim.NeovimClient | null = null;
   isActive = false;
+  isDisposing = false;
 
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
     this.config = this.loadConfig();
   }
 
-  static TABS_MODE = "TabsMode";
+  static KEY_TABS_MODE = "TabsMode";
 
   get tabsMode() {
-    return this.context.globalState.get<EditorTabsMode>(VimMode.TABS_MODE);
+    return this.context.globalState.get<EditorTabsMode>(VimMode.KEY_TABS_MODE);
   }
 
   set tabsMode(mode: EditorTabsMode | undefined) {
-    this.context.globalState.update(VimMode.TABS_MODE, mode);
+    this.context.globalState.update(VimMode.KEY_TABS_MODE, mode);
   }
 
   loadConfig(): Config {
@@ -57,31 +64,38 @@ class VimMode {
 
   registerCommands() {
     this.context.subscriptions.push(
-      vscode.commands.registerCommand(THIS + ".toggleVimMode", () =>
-        this.toggle(),
+      vscode.commands.registerCommand(
+        THIS + ".toggleVimMode",
+        async () => await this.toggle(),
       ),
-      vscode.commands.registerCommand(THIS + ".vim", () => this.toggle()),
+      vscode.commands.registerCommand(
+        THIS + ".vim",
+        async () => await this.toggle(),
+      ),
     );
   }
 
   registerEventHandlers() {
     this.context.subscriptions.push(
-      vscode.window.tabGroups.onDidChangeTabs((e) => {
+      vscode.window.tabGroups.onDidChangeTabs(async (e) => {
         if (e.closed.some((tab) => tab.label === VimMode.MODE_NAME)) {
-          this.handleExit();
+          await this.handleExit();
         }
       }),
-      vscode.workspace.onDidOpenTextDocument((doc) => this.syncFile(doc.uri)),
-      vscode.window.onDidChangeActiveTextEditor(
-        (e) => e && this.syncFile(e.document.uri),
+      vscode.workspace.onDidOpenTextDocument(
+        async (doc) => await this.syncFile(doc.uri),
       ),
-      vscode.workspace.onDidSaveTextDocument((doc) =>
-        this.syncFileSave(doc.uri),
+      vscode.window.onDidChangeActiveTextEditor(
+        async (e) => e && (await this.syncFile(e.document.uri)),
+      ),
+      vscode.workspace.onDidSaveTextDocument(
+        async (doc) => await this.syncFileSave(doc.uri),
       ),
       // exit vim mode when text editor changed
-      vscode.window.onDidChangeActiveTextEditor((e) => {
+      vscode.window.onDidChangeActiveTextEditor(async (e) => {
         if (e && this.isActive) {
-          this.exit({ openCurFile: false });
+          // exit and trigger handleExit
+          this.vimTerminal?.dispose();
         }
       }),
     );
@@ -148,7 +162,7 @@ class VimMode {
     }
   }
 
-  async enter() {
+  async beforeEnter() {
     // save original tabs mode
     if (!this.tabsMode) {
       this.tabsMode =
@@ -157,24 +171,27 @@ class VimMode {
           .get<EditorTabsMode>("editor.showTabs") ?? EditorTabsMode.MULTIPLE;
     }
 
+    // save edit state
+    this.editState = {};
+    const editor = vscode.window.activeTextEditor;
+    this.editState.file = editor?.document.uri.fsPath;
+    if (this.editState.file) {
+      this.editState.line = editor?.selection.active.line;
+    }
+
+    // stop nvim if necessary
+    this.stopNvimProc();
+  }
+
+  async enter() {
+    await this.beforeEnter();
+
     // get pwd
     const pwd =
       vscode.workspace.workspaceFolders &&
       vscode.workspace.getWorkspaceFolder(
         vscode.workspace.workspaceFolders[0].uri,
       )?.uri.fsPath;
-    // get current file
-    var curFile: string | undefined;
-    const editor = vscode.window.activeTextEditor;
-    curFile = editor?.document.uri.fsPath;
-    // get current line
-    var curLine: number | undefined;
-    if (curFile) {
-      curLine = editor?.selection.active.line;
-    }
-
-    // stop nvim if necessary
-    this.stopNvimProc();
     // create terminal
     this.vimTerminal = vscode.window.createTerminal({
       name: VimMode.MODE_NAME,
@@ -183,7 +200,7 @@ class VimMode {
     const vimArgs = vscode.workspace
       .getConfiguration(THIS)
       .get<string>("vimArgs");
-    var vimCmd = `${this.config.vimPath} ${vimArgs} '${curFile || pwd || "./"}'`;
+    var vimCmd = `${this.config.vimPath} ${vimArgs} '${this.editState.file || pwd || "./"}'`;
     if (this.hasNvim()) {
       vimCmd = `NVIM_LISTEN_ADDRESS=${VimMode.NVIM_LISTEN_ADDRESS} ${vimCmd}`;
     }
@@ -196,69 +213,50 @@ class VimMode {
     this.isActive = true;
     // reset nvim client
     this.resetNvimClient();
-
     // after enter
+    await this.afterEnter();
+  }
+
+  async afterEnter() {
     // go to line
-    if (curLine) {
-      const line = curLine + 1;
-      this.vimTerminal.sendText(`:${line}`, true);
+    if (this.editState.line) {
+      const line = this.editState.line + 1;
+      this.vimTerminal?.sendText(`:${line}`, true);
     }
   }
 
-  async exit({
-    startNvim = true,
-    openCurFile = true,
-  }: { startNvim?: boolean; openCurFile?: boolean } = {}) {
-    var curLine: number | null = null;
-
+  async beforeExit() {
+    // save edit state
+    this.editState = {};
     if (this.vimTerminal) {
       // open editing file if nvim
-      if (openCurFile && this.hasNvim()) {
-        const curFile = await this.getNvimClient()?.buffer.name;
+      if (this.hasNvim()) {
+        this.editState.file = await this.getNvimClient()?.buffer.name;
 
-        if (curFile && fs.existsSync(curFile)) {
-          const document = await vscode.workspace.openTextDocument(curFile);
+        if (this.editState.file && fs.existsSync(this.editState.file)) {
+          const document = await vscode.workspace.openTextDocument(
+            this.editState.file,
+          );
           vscode.window.showTextDocument(document);
 
           // save current line
           const cursor = await this.getNvimClient()?.window.cursor;
           if (cursor) {
-            curLine = cursor[0];
+            this.editState.line = cursor[0];
           }
         }
       }
-      // exit vim mode, trigger handleVimModeExit
-      this.vimTerminal.dispose();
-    }
-    if (startNvim && this.needNvimProc() && !this.nvimProc) {
-      this.startNvimProc();
-    }
-
-    // after exit
-    // go to line
-    if (curLine) {
-      const line = curLine - 1;
-      retry({
-        task: async () => {
-          const editor = vscode.window.activeTextEditor;
-          if (!editor) {
-            return false;
-          }
-          const position = new vscode.Position(line, 0);
-          editor.selection = new vscode.Selection(position, position);
-          editor.revealRange(new vscode.Range(position, position));
-          return true;
-        },
-        interval: 200,
-        timeout: 2000,
-        onTimeout: () => {
-          console.warn("timeout to set editor line");
-        },
-      });
     }
   }
 
-  handleExit() {
+  async exit() {
+    await this.beforeExit();
+
+    // exit vim mode, trigger handleExit
+    this.vimTerminal?.dispose();
+  }
+
+  async handleExit() {
     // reset tabs
     const tabsMode = vscode.workspace
       .getConfiguration("workbench")
@@ -278,14 +276,46 @@ class VimMode {
     this.isActive = false;
     // reset nvim client
     this.resetNvimClient();
+    // after exit
+    await this.afterExit();
+  }
+
+  async afterExit() {
+    // go to line
+    if (this.editState.line) {
+      const line = this.editState.line - 1;
+      retry({
+        task: async () => {
+          const editor = vscode.window.activeTextEditor;
+          if (!editor) {
+            return false;
+          }
+          const position = new vscode.Position(line, 0);
+          editor.selection = new vscode.Selection(position, position);
+          editor.revealRange(new vscode.Range(position, position));
+          return true;
+        },
+        interval: 200,
+        timeout: 2000,
+        onTimeout: () => {
+          console.warn("timeout to set editor line");
+        },
+      });
+    }
+
+    // start nvim if necessary
+    if (!this.isDisposing && this.needNvimProc() && !this.nvimProc) {
+      this.startNvimProc();
+    }
   }
 
   async toggle() {
     this.isActive ? await this.exit() : await this.enter();
   }
 
-  dispose() {
-    this.isActive ? this.exit({ startNvim: false }) : this.stopNvimProc();
+  async dispose() {
+    this.isDisposing = true;
+    this.isActive ? await this.exit() : this.stopNvimProc();
   }
 }
 
@@ -304,18 +334,13 @@ export async function activate(context: vscode.ExtensionContext) {
   vimMode.registerCommands();
   vimMode.registerEventHandlers();
 
-  // exit vim mode if necessary
-  vimMode.handleExit();
-
-  // start nvim if necessary
-  if (vimMode.needNvimProc()) {
-    vimMode.startNvimProc();
-  }
+  // reexit vim mode if necessary
+  await vimMode.handleExit();
 }
 
 // This method is called when your extension is deactivated
 export async function deactivate() {
-  vimMode?.dispose();
+  await vimMode?.dispose();
 }
 
 //
