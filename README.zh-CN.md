@@ -1,5 +1,7 @@
 # vscode-vim-mode
 
+`vscode-vim-mode` 是一个 Visual Studio Code 扩展，提供 Vim 模式。通过这个扩展，用户可以在 VS Code 中使用 Vim 或 Neovim 进行编辑。
+
 ```
 🌟 在 VSCode 中使用完整的 Vim 功能，且能无缝切换
 🌟 适合重度 Vim 用户，又想充分享用 VSCode 的生态（比如：Copilot）的你（我）
@@ -7,8 +9,6 @@
 🌟 能利用双方的生态，且避免了冲突，满足`既要又要`
 🌟 可以和其他 Vim 模拟插件配合使用，无冲突 (比如: VSCodeNeovim、VSCodeVim)
 ```
-
-`vscode-vim-mode` 是一个 Visual Studio Code 扩展，提供 Vim 模式。通过这个扩展，用户可以在 VS Code 中使用 Vim 或 Neovim 进行编辑。
 
 ## 功能
 
