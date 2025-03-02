@@ -16,6 +16,8 @@
 
 [中文文档](README.zh-CN.md)
 
+`vscode-vim-mode` is a Visual Studio Code extension that provides Vim mode. With this extension, users can edit in VS Code using Vim or Neovim.
+
 ```
 🌟 Use full Vim features in VSCode with seamless switching
 🌟 Perfect for heavy Vim users who want to fully enjoy VSCode's ecosystem (e.g., Copilot)
@@ -23,8 +25,6 @@
 🌟 Leverage both ecosystems, avoid conflicts, and satisfy 'both/and'
 🌟 Can be used alongside other Vim emulation plugins without conflicts (e.g., VSCodeNeovim, VSCodeVim)
 ```
-
-`vscode-vim-mode` is a Visual Studio Code extension that provides Vim mode. With this extension, users can edit in VS Code using Vim or Neovim.
 
 ## Features
 
