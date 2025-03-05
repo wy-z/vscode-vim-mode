@@ -3,6 +3,7 @@ import * as cp from "node:child_process";
 import * as fs from "node:fs";
 import * as neovim from "neovim";
 import * as util from "node:util";
+import * as net from "node:net";
 
 const exec = util.promisify(cp.exec);
 
@@ -123,13 +124,13 @@ class VimMode {
 
   async syncFile(uri: vscode.Uri) {
     if (uri.scheme === "file" && this.nvimProc) {
-      await this.getNvimClient()?.command(`e ${uri.fsPath}`);
+      await (await this.getNvimClient())?.command(`e ${uri.fsPath}`);
     }
   }
 
   async syncFileSave(uri: vscode.Uri) {
     if (uri.scheme === "file" && this.nvimProc) {
-      await this.getNvimClient()?.command(`e ${uri.fsPath} | e! | w`);
+      await (await this.getNvimClient())?.command(`e ${uri.fsPath} | e! | w`);
     }
   }
 
@@ -141,12 +142,17 @@ class VimMode {
     return this.hasNvim() && this.config.replaySave;
   }
 
-  getNvimClient(): neovim.NeovimClient | null {
+  async getNvimClient(): Promise<neovim.NeovimClient | null> {
     if (!this._nvimClient) {
       if (this.isActive && fs.existsSync(VimMode.NVIM_LISTEN_ADDRESS)) {
-        this._nvimClient = neovim.attach({
-          socket: VimMode.NVIM_LISTEN_ADDRESS,
-        });
+        try {
+          this._nvimClient = await neovimAttachSocket(
+            VimMode.NVIM_LISTEN_ADDRESS,
+          );
+        } catch (error) {
+          console.error("failed to attach nvim", error);
+          return null;
+        }
       } else if (this.nvimProc) {
         this._nvimClient = neovim.attach({ proc: this.nvimProc });
       }
@@ -247,7 +253,7 @@ class VimMode {
     if (this.vimTerminal) {
       // open editing file if nvim
       if (this.hasNvim()) {
-        this.editState.file = await this.getNvimClient()?.buffer.name;
+        this.editState.file = await (await this.getNvimClient())?.buffer.name;
 
         if (this.editState.file && fs.existsSync(this.editState.file)) {
           const document = await vscode.workspace.openTextDocument(
@@ -256,7 +262,7 @@ class VimMode {
           vscode.window.showTextDocument(document);
 
           // save current line
-          const cursor = await this.getNvimClient()?.window.cursor;
+          const cursor = await (await this.getNvimClient())?.window.cursor;
           if (cursor) {
             this.editState.line = cursor[0];
           }
@@ -362,6 +368,7 @@ export async function deactivate() {
 // Utils
 //
 
+// retry until task return true
 function retry({
   task,
   interval,
@@ -407,4 +414,21 @@ function retry({
   }
   // return cancel
   return cancel;
+}
+
+// rewrite neovim socket attach to handle exception
+async function neovimAttachSocket(
+  socket: string,
+): Promise<neovim.NeovimClient> {
+  const client: net.Socket = await new Promise((resolve, reject) => {
+    const c = net.createConnection(socket);
+    c.once("connect", () => resolve(c));
+    c.once("error", (err) => reject(err));
+  });
+  const nvim = new neovim.NeovimClient();
+  nvim.attach({
+    writer: client,
+    reader: client,
+  });
+  return nvim;
 }
