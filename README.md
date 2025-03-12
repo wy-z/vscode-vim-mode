@@ -23,7 +23,7 @@
 🌟 Perfect for heavy Vim users who want to fully enjoy VSCode's ecosystem (e.g., Copilot)
 🌟 Probably the most straightforward VSCode & Vim integration plugin
 🌟 Leverage both ecosystems, avoid conflicts, and satisfy 'both/and'
-🌟 Can be used alongside other Vim emulation plugins without conflicts (e.g., VSCodeNeovim, VSCodeVim)
+🌟 Can be used alongside other Vim emulation plugins without conflicts (e.g., VSCodeVim, VSCodeNeovim)
 ```
 
 ## Features
