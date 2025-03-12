@@ -315,7 +315,7 @@ class VimMode {
           editor.selection = new vscode.Selection(position, position);
           editor.revealRange(
             new vscode.Range(position, position),
-            vscode.TextEditorRevealType.InCenter,
+            vscode.TextEditorRevealType.InCenterIfOutsideViewport,
           );
           return true;
         },
