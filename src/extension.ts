@@ -313,7 +313,10 @@ class VimMode {
           }
           const position = new vscode.Position(line, 0);
           editor.selection = new vscode.Selection(position, position);
-          editor.revealRange(new vscode.Range(position, position));
+          editor.revealRange(
+            new vscode.Range(position, position),
+            vscode.TextEditorRevealType.InCenter,
+          );
           return true;
         },
         interval: 200,

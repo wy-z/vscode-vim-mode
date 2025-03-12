@@ -1,8 +1,8 @@
 {
   "name": "vscode-vim-mode",
   "displayName": "Vim Mode",
-  "description": "Vim mode for VSCode: Run Vim/Nvim in integrated terminal with seamless switching",
-  "version": "0.2.13",
+  "description": "Vim mode for VSCode, run Vim/Nvim in integrated terminal with seamless switching",
+  "version": "0.2.14",
   "repository": "https://github.com/wy-z/vscode-vim-mode",
   "publisher": "wy-z",
   "engines": {

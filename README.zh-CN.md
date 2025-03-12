@@ -7,7 +7,7 @@
 🌟 适合重度 Vim 用户，又想充分享用 VSCode 的生态（比如：Copilot）的你（我）
 🌟 应该是最简单明了的 VSCode & Vim 集成插件
 🌟 能利用双方的生态，且避免了冲突，满足`既要又要`
-🌟 可以和其他 Vim 模拟插件配合使用，无冲突 (比如: VSCodeNeovim、VSCodeVim)
+🌟 可以和其他 Vim 模拟插件配合使用，无冲突 (比如: VSCodeVim、VSCodeNeovim)
 ```
 
 ## 功能
