@@ -2,10 +2,11 @@ import * as vscode from "vscode";
 import * as cp from "node:child_process";
 import * as fs from "node:fs";
 import * as neovim from "neovim";
-import * as util from "node:util";
-import * as net from "node:net";
+import { promisify } from "node:util";
 
-const exec = util.promisify(cp.exec);
+import * as utils from "./utils";
+
+const exec = promisify(cp.exec);
 
 const enum EditorTabsMode {
   MULTIPLE = "multiple",
@@ -55,6 +56,16 @@ class VimMode {
     }
     this._isActive = value;
     this.afterModeSwitch();
+  }
+
+  getVimModeTab() {
+    const allTabs = vscode.window.tabGroups.all.flatMap((group) => group.tabs);
+    for (const tab of allTabs) {
+      if (tab.label === VimMode.MODE_NAME) {
+        return tab;
+      }
+    }
+    return null;
   }
 
   afterModeSwitch() {
@@ -146,19 +157,23 @@ class VimMode {
     if (!this._nvimClient) {
       if (this.isActive && fs.existsSync(VimMode.NVIM_LISTEN_ADDRESS)) {
         try {
-          this._nvimClient = await neovimAttachSocket(
+          this._nvimClient = await utils.NeovimAttachSocket(
             VimMode.NVIM_LISTEN_ADDRESS,
           );
         } catch (error) {
           console.error("failed to attach nvim", error);
           return null;
         }
-      } else if (this.nvimProc) {
+      } else if (this.nvimProc && this.nvimProc.exitCode === null) {
         this._nvimClient = neovim.attach({ proc: this.nvimProc });
       }
     }
     // nvim may be exited
-    if (this.isActive && !fs.existsSync(VimMode.NVIM_LISTEN_ADDRESS)) {
+    if (
+      this.isActive
+        ? !fs.existsSync(VimMode.NVIM_LISTEN_ADDRESS)
+        : this.nvimProc?.exitCode !== null
+    ) {
       this.resetNvimClient();
     }
     return this._nvimClient;
@@ -305,7 +320,7 @@ class VimMode {
     // go to line
     if (this.editState.line) {
       const line = this.editState.line - 1;
-      retry({
+      utils.Retry({
         task: async () => {
           const editor = vscode.window.activeTextEditor;
           if (!editor) {
@@ -334,6 +349,11 @@ class VimMode {
   }
 
   async toggle() {
+    const tab = this.getVimModeTab();
+    if (tab && !this.isActive) {
+      await vscode.window.tabGroups.close(tab);
+      return;
+    }
     this.isActive ? await this.exit() : await this.enter();
   }
 
@@ -365,73 +385,4 @@ export async function activate(context: vscode.ExtensionContext) {
 // This method is called when your extension is deactivated
 export async function deactivate() {
   await vimMode?.dispose();
-}
-
-//
-// Utils
-//
-
-// retry until task return true
-function retry({
-  task,
-  interval,
-  timeout,
-  onTimeout,
-  onError,
-}: {
-  task: () => Promise<boolean>;
-  interval: number;
-  timeout?: number;
-  onTimeout?: () => void;
-  onError?: (error: any) => void;
-}): () => void {
-  let intervalId: NodeJS.Timeout;
-  let timeoutId: NodeJS.Timeout | null = null;
-  const cancel = () => {
-    clearInterval(intervalId);
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-  };
-
-  // interval
-  intervalId = setInterval(async () => {
-    try {
-      if (await task()) {
-        cancel();
-      }
-    } catch (error) {
-      if (onError) {
-        onError(error);
-      }
-    }
-  }, interval);
-  // timeout
-  if (timeout) {
-    timeoutId = setTimeout(() => {
-      clearInterval(intervalId);
-      if (onTimeout) {
-        onTimeout();
-      }
-    }, timeout);
-  }
-  // return cancel
-  return cancel;
-}
-
-// rewrite neovim socket attach to handle exception
-async function neovimAttachSocket(
-  socket: string,
-): Promise<neovim.NeovimClient> {
-  const client: net.Socket = await new Promise((resolve, reject) => {
-    const c = net.createConnection(socket);
-    c.once("connect", () => resolve(c));
-    c.once("error", (err) => reject(err));
-  });
-  const nvim = new neovim.NeovimClient();
-  nvim.attach({
-    writer: client,
-    reader: client,
-  });
-  return nvim;
 }
