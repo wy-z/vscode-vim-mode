@@ -237,6 +237,12 @@ class VimMode {
       name: VimMode.MODE_NAME,
       location: vscode.TerminalLocation.Editor,
     });
+    // clean stale nvim socket
+    if (fs.existsSync(VimMode.NVIM_LISTEN_ADDRESS)) {
+      fs.rm(VimMode.NVIM_LISTEN_ADDRESS, { force: true }, () => {
+        console.log("removed stale nvim socket");
+      });
+    }
     const vimArgs = vscode.workspace
       .getConfiguration(THIS)
       .get<string>("vimArgs");
